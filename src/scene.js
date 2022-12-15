@@ -4,7 +4,7 @@ var scene;
 var agents = [];
 
 async function createScene() {
-    
+
     canvas = document.getElementById("canvas");
     engine = new BABYLON.Engine(canvas, true);
     scene = new BABYLON.Scene(engine);
@@ -14,6 +14,11 @@ async function createScene() {
     // Loading screen
     //
     engine.displayLoadingUI();
+
+    //
+    // Player
+    //
+    player = await createCharacter(scene, ClientID);
 
     //
     // Create recast
@@ -38,10 +43,11 @@ async function createScene() {
         detailSampleMaxError: 1,
     };
 
-    var player;
+    //
+    // Create navmesh
+    //
     navigationPlugin.createNavMesh([staticMesh], navmeshParameters,(navmeshData) =>
     {
-        console.log("got worker data", navmeshData);
         navigationPlugin.buildFromNavmeshData(navmeshData);
         var navmeshdebug = navigationPlugin.createDebugNavMesh(scene);
         navmeshdebug.position = new BABYLON.Vector3(0, 0.01, 0);
@@ -52,7 +58,7 @@ async function createScene() {
         matdebug.diffuseColor = new BABYLON.Color3(0.1, 0.2, 1);
         matdebug.alpha = 0.2;
         navmeshdebug.material = matdebug;
-        
+
         // crowd
         var crowd = navigationPlugin.createCrowd(10, 0.1, scene);
         var i;
@@ -66,165 +72,154 @@ async function createScene() {
             separationWeight: 1.0
         };
 
-        //
-        // Player
-        //
-        BABYLON.SceneLoader.ImportMesh("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene, function (newMeshes, particleSystems, skeletons, animationGroups) {
+        var targetCube = BABYLON.MeshBuilder.CreateBox("cube", { size: 0.1, height: 0.1 }, scene);
+        var startPos = navigationPlugin.getClosestPoint(new BABYLON.Vector3(0, 0.2, 5));
+        var transform = new BABYLON.TransformNode();
+        var agentIndex = crowd.addAgent(startPos, agentParams, transform);
+        agents.push({idx:agentIndex, trf:transform, mesh:player, target:targetCube});
         
-            player = newMeshes[0];
-            player.isPickable = false;
-            player.checkCollisions = false;
-
-            for (var i = 0; i < newMeshes.length; i++) {
-                newMeshes[i].isPickable = false;
-                newMeshes[i].checkCollisions = false;
+        //
+        // Point n click
+        //
+        var startingPoint;
+        var pickedMesh;
+        var pathLine;
+        var getGroundPosition = function () {
+            var pickinfo = scene.pick(scene.pointerX, scene.pointerY);
+            if (pickinfo.hit) {
+                return pickinfo.pickedPoint;
             }
+
+            return null;
+        }
+
+        var pointerDown = function (mesh) {
+            console.log("picked mesh : " + mesh.name + ", metadata : " + mesh.metadata);
+            pickedMesh = mesh;
+            startingPoint = getGroundPosition();
+            if (startingPoint != null) {
+                var agents = crowd.getAgents();
+                var randomPos = navigationPlugin.getRandomPointAround(startingPoint, 1.0);
+                crowd.agentGoto(agents[0], navigationPlugin.getClosestPoint(startingPoint));
+                var pathPoints = navigationPlugin.computePath(crowd.getAgentPosition(agents[0]), navigationPlugin.getClosestPoint(startingPoint));
+                pathLine = BABYLON.MeshBuilder.CreateDashedLines("ribbon", {points: pathPoints, updatable: true, instance: pathLine}, scene);
+
+                playAnimation(ClientID, 2);
+            }
+        }
+
+        // On reach destination
+        crowd.onReachTargetObservable.add((agentInfos) => {
+
+            stopAnimation(ClientID);
+            
+            // teleport agent to destination
+            crowd.agentTeleport(agents[0], crowd.getAgentPosition(agents[0]));
+
+            if (pickedMesh != null) {
+                    
+                console.log("reach destination : " + pickedMesh.metadata);
+
+                if (pickedMesh.metadata == "ground") {
+            
+                    //..
+                    playAnimation(ClientID, 0);
+                }
+                else if (pickedMesh.metadata == "interactable") {
+
+                    //..
+                    playAnimation(ClientID, 1);
+
+                    player.position = pickedMesh.position.clone();
+                    player.rotation = new BABYLON.Vector3(pickedMesh.rotation.x, pickedMesh.rotation.y, 0);
+                    
+                }
+
+                pickedMesh = null;
+            }
+        });
         
-            //Scale the model down        
-            player.scaling.scaleInPlace(0.1);
-            
-            const walkAnim = scene.getAnimationGroupByName("Walking");
-            const walkBackAnim = scene.getAnimationGroupByName("WalkingBack");
-            const idleAnim = scene.getAnimationGroupByName("Idle");
-            const sambaAnim = scene.getAnimationGroupByName("Samba");
+        scene.onPointerObservable.add((pointerInfo) => {      		
+            switch (pointerInfo.type) {
+                case BABYLON.PointerEventTypes.POINTERDOWN:
+                    if(pointerInfo.pickInfo.hit) {
+                        pointerDown(pointerInfo.pickInfo.pickedMesh)
+                    }
+                    break;
+            }
+        });
 
-            var targetCube = BABYLON.MeshBuilder.CreateBox("cube", { size: 0.1, height: 0.1 }, scene);
-            var startPos = navigationPlugin.getClosestPoint(new BABYLON.Vector3(0, 0, 5));
-            var transform = new BABYLON.TransformNode();
-            var agentIndex = crowd.addAgent(startPos, agentParams, transform);
-            agents.push({idx:agentIndex, trf:transform, mesh:player, target:targetCube});
-            
-            //
-            // Point n click
-            //
-            var startingPoint;
-            var pickedMesh;
-            var pathLine;
-            var getGroundPosition = function () {
-                var pickinfo = scene.pick(scene.pointerX, scene.pointerY);
-                if (pickinfo.hit) {
-                    return pickinfo.pickedPoint;
-                }
-
-                return null;
+        var oldPostion = new BABYLON.Vector3(0, 0, 0);
+        scene.onBeforeRenderObservable.add(()=> {
+            var ag = agents[0];
+            ag.mesh.position = crowd.getAgentPosition(ag.idx);
+            let vel = crowd.getAgentVelocity(ag.idx);
+            crowd.getAgentNextTargetPathToRef(ag.idx, ag.target.position);
+            if (vel.length() > 0.2)
+            {
+                player.lookAt(ag.target.position, Math.PI);
             }
 
-            var pointerDown = function (mesh) {
-                console.log("picked mesh : " + mesh.name + ", metadata : " + mesh.metadata);
-                pickedMesh = mesh;
-                startingPoint = getGroundPosition();
-                if (startingPoint != null) {
-                    var agents = crowd.getAgents();
-                    var randomPos = navigationPlugin.getRandomPointAround(startingPoint, 1.0);
-                    crowd.agentGoto(agents[0], navigationPlugin.getClosestPoint(startingPoint));
-                    var pathPoints = navigationPlugin.computePath(crowd.getAgentPosition(agents[0]), navigationPlugin.getClosestPoint(startingPoint));
-                    pathLine = BABYLON.MeshBuilder.CreateDashedLines("ribbon", {points: pathPoints, updatable: true, instance: pathLine}, scene);
+            if (oldPostion.equals(player.position) == false) {
+                oldPostion = player.position;
 
-                    //
-                    idleAnim.stop();
-                    sambaAnim.stop();
-                    walkAnim.start(true, 1.0, walkAnim.from, walkAnim.to, false);
+                // Update position
+                var data = {
+                    username : '',
+                    id : ClientID,
+                    position : {
+                        x : player.position.x,
+                        y : player.position.y,
+                        z : player.position.z
+                    },
+                    rotation : {
+                        x : player.rotation.x,
+                        y : player.rotation.y,
+                        z : player.rotation.z
+                    }
                 }
+                socket.emit('updatePosition', data);
             }
-
-            // On reach destination
-            crowd.onReachTargetObservable.add((agentInfos) => {
-
-                // stop all animation
-                idleAnim.stop();
-                walkAnim.stop();
-                sambaAnim.stop();
-                
-                // teleport agent to destonation
-                crowd.agentTeleport(agents[0], crowd.getAgentPosition(agents[0]));
-
-                if (pickedMesh != null) {
-                        
-                    console.log("reach destination : " + pickedMesh.metadata);
-
-                    if (pickedMesh.metadata == "ground") {
-                
-                        //..
-                        walkAnim.stop();
-                        sambaAnim.stop();
-                        idleAnim.start(true, 1.0, idleAnim.from, idleAnim.to, false);
-                    }
-                    else if (pickedMesh.metadata == "interactable") {
-       
-                        //..
-                        walkAnim.stop();
-                        idleAnim.stop();
-                        sambaAnim.start(true, 1.0, sambaAnim.from, sambaAnim.to, false);
-
-                        player.position = pickedMesh.position.clone();
-                        player.rotation = new BABYLON.Vector3(pickedMesh.rotation.x, pickedMesh.rotation.y, 0);
-                       
-                    }
-
-                    pickedMesh = null;
-                }
-            });
-            
-            scene.onPointerObservable.add((pointerInfo) => {      		
-                switch (pointerInfo.type) {
-                    case BABYLON.PointerEventTypes.POINTERDOWN:
-                        if(pointerInfo.pickInfo.hit) {
-                            pointerDown(pointerInfo.pickInfo.pickedMesh)
-                        }
-                        break;
-                }
-            });
-
-            scene.onBeforeRenderObservable.add(()=> {
-                var ag = agents[0];
-                ag.mesh.position = crowd.getAgentPosition(ag.idx);
-                let vel = crowd.getAgentVelocity(ag.idx);
-                crowd.getAgentNextTargetPathToRef(ag.idx, ag.target.position);
-                if (vel.length() > 0.2)
-                {
-                    player.lookAt(ag.target.position, Math.PI);
-                }
-            });  
-
-            //
-            // Light
-            //
-            var light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
-
-            //
-            // Interactable
-            //
-            var sphere = BABYLON.MeshBuilder.CreateSphere("chair", {subdivisions: 8, diameter: 1}, scene);
-            sphere.metadata = "interactable";
-            var spherePositionArray = [
-                [new BABYLON.Vector3(5, 0, 5), new BABYLON.Vector3(BABYLON.Tools.ToRadians(0), BABYLON.Tools.ToRadians(0), BABYLON.Tools.ToRadians(180))],
-            ];
-            sphere.position = spherePositionArray[0][0];
-            sphere.rotation = spherePositionArray[0][1];
-
-            //
-            //CAMERA
-            //
-            var camera = new BABYLON.ArcRotateCamera("camera", BABYLON.Tools.ToRadians(90), BABYLON.Tools.ToRadians(60), 20, new BABYLON.Vector3(0, 1, 0), scene);
-            camera.lowerRadiusLimit = 10;
-            camera.upperRadiusLimit = 90;
-            camera.upperBetaLimit = Math.PI / 2 - 0.1;
-            camera.attachControl(canvas, true);
-            camera.inputs.attached.pointers.buttons = [1]; //wheel click change position for camera
-            camera.lockedTarget = player;
-            
-            // run the render loop
-            engine.runRenderLoop(function(){
-                scene.render();
-            });
-
-            // the canvas/window resize event handler
-            window.addEventListener('resize', function(){
-                engine.resize();
-            });
-
-            engine.hideLoadingUI();
         });  
+
+        //
+        // Light
+        //
+        var light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
+
+        //
+        // Interactable
+        //
+        var sphere = BABYLON.MeshBuilder.CreateSphere("chair", {subdivisions: 8, diameter: 1}, scene);
+        sphere.metadata = "interactable";
+        var spherePositionArray = [
+            [new BABYLON.Vector3(5, 0, 5), new BABYLON.Vector3(BABYLON.Tools.ToRadians(0), BABYLON.Tools.ToRadians(0), BABYLON.Tools.ToRadians(180))],
+        ];
+        sphere.position = spherePositionArray[0][0];
+        sphere.rotation = spherePositionArray[0][1];
+
+        //
+        //CAMERA
+        //
+        var camera = new BABYLON.ArcRotateCamera("camera", BABYLON.Tools.ToRadians(90), BABYLON.Tools.ToRadians(60), 20, new BABYLON.Vector3(0, 1, 0), scene);
+        camera.lowerRadiusLimit = 10;
+        camera.upperRadiusLimit = 90;
+        camera.upperBetaLimit = Math.PI / 2 - 0.1;
+        camera.attachControl(canvas, true);
+        camera.inputs.attached.pointers.buttons = [1]; //wheel click change position for camera
+        camera.lockedTarget = player;
+        
+        // run the render loop
+        engine.runRenderLoop(function(){
+            scene.render();
+        });
+
+        // the canvas/window resize event handler
+        window.addEventListener('resize', function(){
+            engine.resize();
+        });
+
+        engine.hideLoadingUI();
     });
 };
 
@@ -259,4 +254,97 @@ function createStaticMesh(scene) {
     var mesh = BABYLON.Mesh.MergeMeshes([sphere, cube, ground]);
     mesh.metadata = "ground";
     return mesh;
+}
+
+//
+// Import and create character
+//
+async function createCharacter(scene, id) {
+
+    //
+    // Player
+    //
+    /*const result = await BABYLON.SceneLoader.ImportMeshAsync("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene);
+    var mesh = result.meshes[0];
+    mesh.name = 'char' + id;
+    mesh.position = new BABYLON.Vector3(0, 0.2, 5);
+    mesh.rotation = new BABYLON.Vector3(0, 10, 0);
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;      
+    mesh.scaling.scaleInPlace(0.1);
+
+    for (var i = 0; i < result.meshes.length; i++) {
+        result.meshes[i].isPickable = false;
+        result.meshes[i].checkCollisions = false;
+    }*/
+
+    const { meshes, animationGroups } = await BABYLON.SceneLoader.ImportMeshAsync("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene);
+    var mesh = meshes[0];
+    mesh.name = id;
+    mesh.position = new BABYLON.Vector3(0, 0.2, 5);
+    mesh.rotation = new BABYLON.Vector3(0, 10, 0);
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;      
+    mesh.scaling.scaleInPlace(0.1);
+
+    for (var i = 0; i < meshes.length; i++) {
+        meshes[i].isPickable = false;
+        meshes[i].checkCollisions = false;
+    }
+
+    //
+    players[id] = mesh;
+    animationPairings[id] = animationGroups;
+
+    return mesh;
+
+    /*BABYLON.SceneLoader.ImportMesh("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene, function (newMeshes, particleSystems, skeletons, animationGroups) {
+    
+        var mesh;
+        mesh = newMeshes[0];
+        mesh.isPickable = false;
+        mesh.checkCollisions = false;
+
+        for (var i = 0; i < newMeshes.length; i++) {
+            newMeshes[i].isPickable = false;
+            newMeshes[i].checkCollisions = false;
+        }
+    
+        //Scale the model down        
+        mesh.scaling.scaleInPlace(0.1);
+
+        return mesh;
+    });*/
+}
+
+//
+// idle = 0, samba = 1, walk = 2, walkback = 3
+//
+function playAnimation (id, anim) {
+
+    var animGroup = animationPairings[id];
+    animGroup[anim].play(true);
+
+    var data = {
+        id : id,
+        animation : anim
+    }
+    socket.emit('updateAnimation', data);
+}
+
+//
+// stop all animation
+//
+function stopAnimation (id) {
+
+    var animGroup = animationPairings[id];
+    for (var i = 0; i < animGroup.length; i++) {
+        animGroup[i].stop();
+    }
+
+    var data = {
+        id : id,
+        animation : -1
+    }
+    socket.emit('updateAnimation', data);
 }
