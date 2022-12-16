@@ -17,6 +17,8 @@ function initSocket() {
         console.log('register ' + data.id);
 
         ClientID = data.id;
+
+        mainFunction(1000);
         createScene();
 
     });
@@ -40,7 +42,6 @@ function initSocket() {
     socket.on('updateAnimation', function (data) {
 
         if (players[data.id]) {
-            console.log(data.animation);
             var animGroup = animationPairings[data.id];
             if (data.animation >= 0) {
                 animGroup[data.animation].play(true);
@@ -48,17 +49,70 @@ function initSocket() {
                 for (var i = 0; i < animGroup.length; i++) {
                     animGroup[i].stop();
                 }
-                console.log("stopall");
             }
         }
     });
+
+    socket.on("UPDATE_VOICE", function (data) {
+        var audio = new Audio(data);
+        audio.muted = false;
+        audio.play();
+        //console.log(data);
+	});
 
     socket.on('disconnected', function (data) {
 
         if (players[data.id]) {
             console.log('dispose ' + data.id);
             players[data.id].dispose();
+            //animationPairings[data.id].dispose();
             delete players[data.id];
+            delete animationPairings[data.id];
         }
     });
+}
+
+window.onload = (e) => {
+
+	//mainFunction(1000);
+
+};
+  
+function mainFunction(time) {
+  
+	navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+
+	    var madiaRecorder = new MediaRecorder(stream);
+	    madiaRecorder.start();
+  
+	    var audioChunks = [];
+  
+        madiaRecorder.addEventListener("dataavailable", function (event) {
+            audioChunks.push(event.data);
+        });
+    
+	    madiaRecorder.addEventListener("stop", function () {
+            var audioBlob = new Blob(audioChunks);
+    
+            audioChunks = [];
+    
+            var fileReader = new FileReader();
+            fileReader.readAsDataURL(audioBlob);
+            fileReader.onloadend = function () {
+    
+                var base64String = fileReader.result;
+                socket.emit("UPDATE_VOICE", base64String);
+            };
+    
+            madiaRecorder.start();
+    
+            setTimeout(function () {
+                madiaRecorder.stop();
+            }, time);
+	    });
+  
+        setTimeout(function () { 
+            madiaRecorder.stop(); 
+        }, time);
+	});
 }

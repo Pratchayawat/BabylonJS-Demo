@@ -66,6 +66,16 @@ io.on('connection', function (socket) {
         socket.broadcast.emit('updateAnimation', data);
     });
 
+    // Voice chat
+    socket.on('UPDATE_VOICE', function(data) {
+    
+        var newData = data.split(";");
+        newData[0] = "data:audio/ogg;";
+        newData = newData[0] + newData[1];
+
+        socket.broadcast.emit('UPDATE_VOICE', newData);
+    });
+
     socket.on('disconnect', function () {
         console.log("Client " + socket.id + " disconnected");
 

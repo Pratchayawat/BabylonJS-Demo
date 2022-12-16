@@ -94,7 +94,7 @@ async function createScene() {
         }
 
         var pointerDown = function (mesh) {
-            console.log("picked mesh : " + mesh.name + ", metadata : " + mesh.metadata);
+            // console.log("picked mesh : " + mesh.name + ", metadata : " + mesh.metadata);
             pickedMesh = mesh;
             startingPoint = getGroundPosition();
             if (startingPoint != null) {
@@ -118,7 +118,7 @@ async function createScene() {
 
             if (pickedMesh != null) {
                     
-                console.log("reach destination : " + pickedMesh.metadata);
+                // console.log("reach destination : " + pickedMesh.metadata);
 
                 if (pickedMesh.metadata == "ground") {
             
