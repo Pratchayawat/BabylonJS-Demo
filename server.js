@@ -23,7 +23,7 @@ io.on('connection', function (socket) {
     sockets[thisPlayerID] = socket;
     
     // Tell the client that this is our id for server
-    socket.emit('register', {id : thisPlayerID});
+    socket.emit('register', player );
     socket.emit('spawn', player); // Tell myself to spawn
     socket.broadcast.emit('spawn', player) // Tell other I have spawn
 
@@ -45,35 +45,29 @@ io.on('connection', function (socket) {
         player.rotation.y = data.rotation.y;
         player.rotation.z = data.rotation.z;
 
-        /*var d = {
-            id : "",
-            position : {
-                x : player.position.x,
-                y : player.position.y
-            }
-        }*/
-       
         socket.broadcast.emit('updatePosition', player);
     });
 
     // Animation Data from client
     socket.on('updateAnimation', function(data) {
         
-        /*var data = {
-            id : ClientID,
-            animation : anim
-        }*/
         socket.broadcast.emit('updateAnimation', data);
     });
 
     // Voice chat
-    socket.on('UPDATE_VOICE', function(data) {
+    socket.on('update_voice', function(data) {
     
         var newData = data.split(";");
         newData[0] = "data:audio/ogg;";
         newData = newData[0] + newData[1];
 
-        socket.broadcast.emit('UPDATE_VOICE', newData);
+        socket.broadcast.emit('update_voice', newData);
+    });
+
+    socket.on('audio_mute', function(data) {
+
+        player.isMute = data.isMute;
+        socket.broadcast.emit('audio_mute', player);
     });
 
     socket.on('disconnect', function () {

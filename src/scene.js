@@ -3,7 +3,7 @@ var engine;
 var scene;
 var agents = [];
 
-async function createScene() {
+async function createScene(data) {
 
     canvas = document.getElementById("canvas");
     engine = new BABYLON.Engine(canvas, true);
@@ -18,7 +18,8 @@ async function createScene() {
     //
     // Player
     //
-    player = await createCharacter(scene, ClientID);
+    await createCharacter(data);
+    var player = players[clientID].mesh;
 
     //
     // Create recast
@@ -104,14 +105,14 @@ async function createScene() {
                 var pathPoints = navigationPlugin.computePath(crowd.getAgentPosition(agents[0]), navigationPlugin.getClosestPoint(startingPoint));
                 pathLine = BABYLON.MeshBuilder.CreateDashedLines("ribbon", {points: pathPoints, updatable: true, instance: pathLine}, scene);
 
-                playAnimation(ClientID, 2);
+                playAnimation(clientID, 2);
             }
         }
 
         // On reach destination
         crowd.onReachTargetObservable.add((agentInfos) => {
 
-            stopAnimation(ClientID);
+            stopAnimation(clientID);
             
             // teleport agent to destination
             crowd.agentTeleport(agents[0], crowd.getAgentPosition(agents[0]));
@@ -123,12 +124,12 @@ async function createScene() {
                 if (pickedMesh.metadata == "ground") {
             
                     //..
-                    playAnimation(ClientID, 0);
+                    playAnimation(clientID, 0);
                 }
                 else if (pickedMesh.metadata == "interactable") {
 
                     //..
-                    playAnimation(ClientID, 1);
+                    playAnimation(clientID, 1);
 
                     player.position = pickedMesh.position.clone();
                     player.rotation = new BABYLON.Vector3(pickedMesh.rotation.x, pickedMesh.rotation.y, 0);
@@ -166,7 +167,7 @@ async function createScene() {
                 // Update position
                 var data = {
                     username : '',
-                    id : ClientID,
+                    id : clientID,
                     position : {
                         x : player.position.x,
                         y : player.position.y,
@@ -202,13 +203,33 @@ async function createScene() {
         //CAMERA
         //
         var camera = new BABYLON.ArcRotateCamera("camera", BABYLON.Tools.ToRadians(90), BABYLON.Tools.ToRadians(60), 20, new BABYLON.Vector3(0, 1, 0), scene);
-        camera.lowerRadiusLimit = 10;
-        camera.upperRadiusLimit = 90;
+        camera.lowerRadiusLimit = 20;
+        camera.upperRadiusLimit = 20;
         camera.upperBetaLimit = Math.PI / 2 - 0.1;
         camera.attachControl(canvas, true);
         camera.inputs.attached.pointers.buttons = [1]; //wheel click change position for camera
         camera.lockedTarget = player;
         
+        // Interface
+        var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("Interface");
+        var button = BABYLON.GUI.Button.CreateImageOnlyButton("btn_mute", "./img/speaker.png");
+        button.width = "30px";
+        button.height = "30px";
+        button.color = "white";
+        button.background = "white";
+        button.left = -10;
+        button.top = 10;
+        button.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+        button.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        button.onPointerClickObservable.add(() => {
+            var curPlayer = players[clientID];
+            curPlayer.isMute = !curPlayer.isMute;
+            curPlayer.speakerIcon.alpha = curPlayer.isMute == true ? 0 : 1;
+            button.image.source = curPlayer.isMute == true ? "./img/speaker_mute.png" : "./img/speaker.png"
+            socket.emit('audio_mute', { "isMute" : curPlayer.isMute });
+        });
+        advancedTexture.addControl(button);    
+
         // run the render loop
         engine.runRenderLoop(function(){
             scene.render();
@@ -233,7 +254,7 @@ function createStaticMesh(scene) {
     //
     var ground = BABYLON.MeshBuilder.CreateGround("ground", {height: 50, width: 50, subdivisions: 4});
     var groundMaterial = new BABYLON.StandardMaterial("groundMaterial", scene);
-    groundMaterial.diffuseTexture = new BABYLON.Texture("./textures/floor.jpg", scene);
+    groundMaterial.diffuseTexture = new BABYLON.Texture("./img/floor.jpg", scene);
     groundMaterial.diffuseTexture.uScale = 10;
     groundMaterial.diffuseTexture.vScale = 10;
     groundMaterial.specularColor = new BABYLON.Color3(.1, .1, .1);
@@ -259,30 +280,18 @@ function createStaticMesh(scene) {
 //
 // Import and create character
 //
-async function createCharacter(scene, id) {
+async function createCharacter(data) {
 
     //
     // Player
     //
-    /*const result = await BABYLON.SceneLoader.ImportMeshAsync("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene);
-    var mesh = result.meshes[0];
-    mesh.name = 'char' + id;
-    mesh.position = new BABYLON.Vector3(0, 0.2, 5);
-    mesh.rotation = new BABYLON.Vector3(0, 10, 0);
-    mesh.isPickable = false;
-    mesh.checkCollisions = false;      
-    mesh.scaling.scaleInPlace(0.1);
-
-    for (var i = 0; i < result.meshes.length; i++) {
-        result.meshes[i].isPickable = false;
-        result.meshes[i].checkCollisions = false;
-    }*/
-
     const { meshes, animationGroups } = await BABYLON.SceneLoader.ImportMeshAsync("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene);
     var mesh = meshes[0];
-    mesh.name = id;
-    mesh.position = new BABYLON.Vector3(0, 0.2, 5);
-    mesh.rotation = new BABYLON.Vector3(0, 10, 0);
+    mesh.name = data.id;
+    // mesh.position = new BABYLON.Vector3(0, 0.2, 5);
+    // mesh.rotation = new BABYLON.Vector3(0, 10, 0);
+    mesh.position = new BABYLON.Vector3(data.position.x, data.position.y, data.position.z);
+    mesh.rotation = new BABYLON.Vector3(data.rotation.x, data.rotation.y, data.rotation.z);
     mesh.isPickable = false;
     mesh.checkCollisions = false;      
     mesh.scaling.scaleInPlace(0.1);
@@ -292,29 +301,30 @@ async function createCharacter(scene, id) {
         meshes[i].checkCollisions = false;
     }
 
-    //
-    players[id] = mesh;
-    animationPairings[id] = animationGroups;
+    // create custom pivot position of mesh
+    var center = BABYLON.MeshBuilder.CreateBox("cube", { size: 1, height: 1 }, scene);
+    center.position = new BABYLON.Vector3(mesh.position.x, mesh.position.y + 2, mesh.position.z);
+    center.setParent(mesh);
+    center.setEnabled(false);
+
+    // In-game UI
+    var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("IngameUI");
+
+    var speaker = new BABYLON.GUI.Image("speakerIcon", "/img/speaker.png");
+    speaker.width = "20px";
+    speaker.height = "20px";
+    advancedTexture.addControl(speaker);
+    speaker.linkWithMesh(center);   
+    speaker.linkOffsetY = -30;
+    speaker.alpha = data.isMute == true ? 0 : 1;
+
+    // adding data to dictionary
+    players[data.id] = new Player();
+    players[data.id].mesh = mesh;
+    players[data.id].animationGroup = animationGroups;
+    players[data.id].speakerIcon = speaker;
 
     return mesh;
-
-    /*BABYLON.SceneLoader.ImportMesh("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene, function (newMeshes, particleSystems, skeletons, animationGroups) {
-    
-        var mesh;
-        mesh = newMeshes[0];
-        mesh.isPickable = false;
-        mesh.checkCollisions = false;
-
-        for (var i = 0; i < newMeshes.length; i++) {
-            newMeshes[i].isPickable = false;
-            newMeshes[i].checkCollisions = false;
-        }
-    
-        //Scale the model down        
-        mesh.scaling.scaleInPlace(0.1);
-
-        return mesh;
-    });*/
 }
 
 //
@@ -322,7 +332,7 @@ async function createCharacter(scene, id) {
 //
 function playAnimation (id, anim) {
 
-    var animGroup = animationPairings[id];
+    var animGroup = players[id].animationGroup;
     animGroup[anim].play(true);
 
     var data = {
@@ -337,7 +347,7 @@ function playAnimation (id, anim) {
 //
 function stopAnimation (id) {
 
-    var animGroup = animationPairings[id];
+    var animGroup = players[id].animationGroup;
     for (var i = 0; i < animGroup.length; i++) {
         animGroup[i].stop();
     }

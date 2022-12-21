@@ -1,7 +1,6 @@
 {
   "name": "babylon",
   "version": "1.0.0",
-  "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -14,5 +13,10 @@
     "shortid": "^2.2.16",
     "socket.io": "^4.5.4",
     "socket.io-client": "^4.5.4"
-  }
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "keywords": [],
+  "description": ""
 }

@@ -1,12 +1,32 @@
-var socket;
-var player; // my player
-var players = []; // all players mesh
-var animationPairings = []; // all palyers animation group
+class Player {
+    constructor() {
+        this.id = "";
+        this.mesh = null;
+        this.position = null;
+        this.rotation = null;
+        this.animationGroup = null;
+        this.speakerIcon = null;
+        this.isMute = false;
+    }
 
-var ClientID;
+    destroy(params) {
+        this.mesh.dispose();
+        //this.animationGroup.dispose();
+        this.speakerIcon.dispose();
+    }
+}
+
+// all players
+var players = [];
+
+// self
+var socket;
+var clientID;
 
 function initSocket() {
     
+    document.getElementById("play").style.visibility = "hidden";
+
     socket = null;
     socket = io().connect();
     socket.on('connect', function () {
@@ -16,33 +36,31 @@ function initSocket() {
     socket.on('register', function (data) {
         console.log('register ' + data.id);
 
-        ClientID = data.id;
-
+        clientID = data.id;
+        
+        createScene(data);
         mainFunction(1000);
-        createScene();
-
     });
 
     socket.on('spawn', function (data) {
   
-        if (data.id != ClientID) {
-            console.log('spawn ' + data.id);
-            createCharacter(scene, data.id);
+        if (data.id != clientID) {
+            createCharacter(data);
         }
     });
 
     socket.on('updatePosition', function (data) {
 
-        if (players[data.id]) {
-            players[data.id].position = new BABYLON.Vector3(data.position.x, data.position.y, data.position.z);
-            players[data.id].rotation = new BABYLON.Vector3(data.rotation.x, data.rotation.y, data.rotation.z);
+        if (players[data.id].mesh) {
+            players[data.id].mesh.position = new BABYLON.Vector3(data.position.x, data.position.y, data.position.z);
+            players[data.id].mesh.rotation = new BABYLON.Vector3(data.rotation.x, data.rotation.y, data.rotation.z);
         }
     });
 
     socket.on('updateAnimation', function (data) {
 
         if (players[data.id]) {
-            var animGroup = animationPairings[data.id];
+            var animGroup = players[data.id].animationGroup;
             if (data.animation >= 0) {
                 animGroup[data.animation].play(true);
             } else {
@@ -53,45 +71,41 @@ function initSocket() {
         }
     });
 
-    socket.on("UPDATE_VOICE", function (data) {
+    socket.on('update_voice', function (data) {
         var audio = new Audio(data);
-        audio.muted = false;
         audio.play();
-        //console.log(data);
+	});
+
+    socket.on('audio_mute', function (data) {
+        players[data.id].isMute = data.isMute;
+        players[data.id].speakerIcon.alpha = data.isMute == true ? 0 : 1;
 	});
 
     socket.on('disconnected', function (data) {
 
         if (players[data.id]) {
             console.log('dispose ' + data.id);
-            players[data.id].dispose();
-            //animationPairings[data.id].dispose();
+            players[data.id].destroy();
             delete players[data.id];
-            delete animationPairings[data.id];
         }
     });
 }
-
-window.onload = (e) => {
-
-	//mainFunction(1000);
-
-};
   
 function mainFunction(time) {
-  
-	navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
 
-	    var madiaRecorder = new MediaRecorder(stream);
-	    madiaRecorder.start();
-  
-	    var audioChunks = [];
-  
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+
+        var madiaRecorder = new MediaRecorder(stream);
+        madiaRecorder.start();
+
+        var audioChunks = [];
+
         madiaRecorder.addEventListener("dataavailable", function (event) {
             audioChunks.push(event.data);
         });
     
-	    madiaRecorder.addEventListener("stop", function () {
+        madiaRecorder.addEventListener("stop", function () {
+            
             var audioBlob = new Blob(audioChunks);
     
             audioChunks = [];
@@ -99,9 +113,11 @@ function mainFunction(time) {
             var fileReader = new FileReader();
             fileReader.readAsDataURL(audioBlob);
             fileReader.onloadend = function () {
-    
+
+                if (players[clientID] == null || players[clientID].isMute == true) return;
+
                 var base64String = fileReader.result;
-                socket.emit("UPDATE_VOICE", base64String);
+                socket.emit("update_voice", base64String);
             };
     
             madiaRecorder.start();
@@ -109,10 +125,10 @@ function mainFunction(time) {
             setTimeout(function () {
                 madiaRecorder.stop();
             }, time);
-	    });
-  
+        });
+
         setTimeout(function () { 
             madiaRecorder.stop(); 
         }, time);
-	});
+    });
 }

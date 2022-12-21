@@ -5,7 +5,8 @@ module.exports = class Player {
     constructor() {
         this.username = '';
         this.id = shortID.generate();
-        this.position = new Vector3();
-        this.rotation = new Vector3();
+        this.position = new Vector3(0, 0.2, 5);
+        this.rotation = new Vector3(0, 10, 0);
+        this.isMute = false;
     }
 }
