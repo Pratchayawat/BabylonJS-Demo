@@ -212,7 +212,7 @@ async function createScene(data) {
         
         // Interface
         var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("Interface");
-        var button = BABYLON.GUI.Button.CreateImageOnlyButton("btn_mute", "./img/speaker.png");
+        var button = BABYLON.GUI.Button.CreateImageOnlyButton("btn_mute", "./img/icon_mic.png");
         button.width = "30px";
         button.height = "30px";
         button.color = "white";
@@ -225,7 +225,7 @@ async function createScene(data) {
             var curPlayer = players[clientID];
             curPlayer.isMute = !curPlayer.isMute;
             curPlayer.speakerIcon.alpha = curPlayer.isMute == true ? 0 : 1;
-            button.image.source = curPlayer.isMute == true ? "./img/speaker_mute.png" : "./img/speaker.png"
+            button.image.source = curPlayer.isMute == true ? "./img/icon_micmute.png" : "./img/icon_mic.png"
             socket.emit('audio_mute', { "isMute" : curPlayer.isMute });
         });
         advancedTexture.addControl(button);    
@@ -310,12 +310,12 @@ async function createCharacter(data) {
     // In-game UI
     var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("IngameUI");
 
-    var speaker = new BABYLON.GUI.Image("speakerIcon", "/img/speaker.png");
+    var speaker = new BABYLON.GUI.Image("icon_mic", "/img/icon_speaker.png");
     speaker.width = "20px";
     speaker.height = "20px";
     advancedTexture.addControl(speaker);
     speaker.linkWithMesh(center);   
-    speaker.linkOffsetY = -30;
+    speaker.linkOffsetY = -35;
     speaker.alpha = data.isMute == true ? 0 : 1;
 
     // adding data to dictionary
