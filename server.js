@@ -21,6 +21,9 @@ io.on('connection', function (socket) {
     
     players[thisPlayerID] = player;
     sockets[thisPlayerID] = socket;
+
+    // temp
+    player.username = "Player : " + Object.keys(players).length;
     
     // Tell the client that this is our id for server
     socket.emit('register', player );

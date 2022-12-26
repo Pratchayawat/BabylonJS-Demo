@@ -6,6 +6,7 @@ class Player {
         this.rotation = null;
         this.animationGroup = null;
         this.speakerIcon = null;
+        this.nameLabel = null;
         this.isMute = false;
     }
 
@@ -13,6 +14,7 @@ class Player {
         this.mesh.dispose();
         //this.animationGroup.dispose();
         this.speakerIcon.dispose();
+        this.nameLabel.dispose();
     }
 }
 

@@ -315,14 +315,32 @@ async function createCharacter(data) {
     speaker.height = "20px";
     advancedTexture.addControl(speaker);
     speaker.linkWithMesh(center);   
-    speaker.linkOffsetY = -35;
+    speaker.linkOffsetY = -70;
     speaker.alpha = data.isMute == true ? 0 : 1;
+
+    var name = new BABYLON.GUI.Rectangle();
+    name.width = 0.1;
+    name.height = "30px";
+    name.cornerRadius = 20;
+    name.color = "Orange";
+    name.thickness = 2;
+    name.background = "green";
+    advancedTexture.addControl(name);
+
+    var label = new BABYLON.GUI.TextBlock();
+    label.text = data.username;
+    name.addControl(label);
+    name.linkWithMesh(center);   
+    name.linkOffsetY = -40;
 
     // adding data to dictionary
     players[data.id] = new Player();
+    players[data.id].username = data.username;
+    players[data.id].id = data.id;
     players[data.id].mesh = mesh;
     players[data.id].animationGroup = animationGroups;
     players[data.id].speakerIcon = speaker;
+    players[data.id].nameLabel = name;
 
     return mesh;
 }

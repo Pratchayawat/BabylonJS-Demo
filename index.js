@@ -52,10 +52,14 @@
 // );
 // ReactDOM.render(page, document.getElementById("root"));
 
-function TemporaryName() {
+function Page() {
     return (
         <div>
-            <img src="./img/reacticon.png" width="40px" />
+            <header>
+                <nav>
+                <img src="./img/reacticon.png" width="40px" />
+                </nav>
+            </header>
             <h1>Fun facts about React</h1>
             <ul>
                 <li>Was first release in 2013</li>
@@ -68,5 +72,5 @@ function TemporaryName() {
     )
 }
 
-ReactDOM.render(<TemporaryName />, document.getElementById("root"));
+ReactDOM.render(<Page />, document.getElementById("root"));
 
