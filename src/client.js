@@ -10,9 +10,8 @@ class Player {
         this.isMute = false;
     }
 
-    destroy(params) {
+    destroy() {
         this.mesh.dispose();
-        //this.animationGroup.dispose();
         this.speakerIcon.dispose();
         this.nameLabel.dispose();
     }

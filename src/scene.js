@@ -288,8 +288,6 @@ async function createCharacter(data) {
     const { meshes, animationGroups } = await BABYLON.SceneLoader.ImportMeshAsync("", "https://assets.babylonjs.com/meshes/", "HVGirl.glb", scene);
     var mesh = meshes[0];
     mesh.name = data.id;
-    // mesh.position = new BABYLON.Vector3(0, 0.2, 5);
-    // mesh.rotation = new BABYLON.Vector3(0, 10, 0);
     mesh.position = new BABYLON.Vector3(data.position.x, data.position.y, data.position.z);
     mesh.rotation = new BABYLON.Vector3(data.rotation.x, data.rotation.y, data.rotation.z);
     mesh.isPickable = false;
@@ -318,20 +316,11 @@ async function createCharacter(data) {
     speaker.linkOffsetY = -70;
     speaker.alpha = data.isMute == true ? 0 : 1;
 
-    var name = new BABYLON.GUI.Rectangle();
-    name.width = 0.1;
-    name.height = "30px";
-    name.cornerRadius = 20;
-    name.color = "Orange";
-    name.thickness = 2;
-    name.background = "green";
-    advancedTexture.addControl(name);
-
-    var label = new BABYLON.GUI.TextBlock();
-    label.text = data.username;
-    name.addControl(label);
-    name.linkWithMesh(center);   
-    name.linkOffsetY = -40;
+    var nameLabel = new BABYLON.GUI.TextBlock();
+    nameLabel.text = data.username;
+    advancedTexture.addControl(nameLabel);
+    nameLabel.linkWithMesh(center);   
+    nameLabel.linkOffsetY = -40;
 
     // adding data to dictionary
     players[data.id] = new Player();
@@ -340,7 +329,7 @@ async function createCharacter(data) {
     players[data.id].mesh = mesh;
     players[data.id].animationGroup = animationGroups;
     players[data.id].speakerIcon = speaker;
-    players[data.id].nameLabel = name;
+    players[data.id].nameLabel = nameLabel;
 
     return mesh;
 }
