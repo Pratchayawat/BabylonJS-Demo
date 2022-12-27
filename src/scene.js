@@ -316,6 +316,13 @@ async function createCharacter(data) {
     speaker.linkOffsetY = -70;
     speaker.alpha = data.isMute == true ? 0 : 1;
 
+    var nameBG = new BABYLON.GUI.Image("name_bg", "/img/name_bg.png");
+    nameBG.width = "120px";
+    nameBG.height = "30px";
+    advancedTexture.addControl(nameBG);
+    nameBG.linkWithMesh(center);   
+    nameBG.linkOffsetY = -40;
+
     var nameLabel = new BABYLON.GUI.TextBlock();
     nameLabel.text = data.username;
     advancedTexture.addControl(nameLabel);
